@@ -16,7 +16,7 @@
         <h1>48 hour carbon intensity forecast</h1>
     </div>
     <div id="heading", align="center">
-        <p1>The plot shows the carbon intensity of the electricity generated for the selected region.
+        <p1>The plot shows the Carbon intensity of the electricity generated for the selected region.
             Data comes from the UK National Grid
             <a
                 href="https://carbon-intensity.github.io/api-definitions/?python#carbon-intensity-api-v2-0-0">
@@ -34,7 +34,8 @@
         // function to process the data returned from the API and generate the plot.
         function process_data(data)
             {
-            var times = Repeat(data.data.map(entry => entry.to), 18)
+            var number_of_regions = data.data[0].regions.length
+            var times = Repeat(data.data.map(entry => entry.to), number_of_regions)
             var regions = data.data.map(entry => entry.regions.map(region => region.shortname)).flat()
             var forecasts = data.data.map(entry => entry.regions.map(region => region.intensity.forecast)).flat()
 
@@ -171,7 +172,6 @@
         const Repeat = (arr, repeats) => arr.map(entry => Array.from({length: repeats}, () => entry)).flat()
         const fetchPromise = fetch(`https://api.carbonintensity.org.uk/regional/intensity/${iso_str}/fw48h`)
         .then((response) => response.json()).then(function(_data) {process_data(_data)})
-        
     </script>
     </div>
     <div id = "button", align = "center">
