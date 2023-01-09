@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<html>
+  <head>
+    <title>Carbon intensity Plot</title>
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <style type="text/css">      
+      html, body, #container { 
+        width: 100%; height: 100%; margin: 10; padding: 0; 
+      }
+    </style>
+  </head>
+  <body>
+    <div id="heading", align="center">
+        <h1>48 hour Carbon Intensity forecast</h1>
+    </div>
+    <div id="heading", align="center">
+        <p1>The plot shows the Carbon intensity of the electricity generated for the selected region.
+            Data comes from the UK National Grid
+            <a
+                href="https://carbon-intensity.github.io/api-definitions/?python#carbon-intensity-api-v2-0-0">
+                Carbon Intensity API
+            </a>.
+        </p1>
+    </div>
+    <div id = "get_plot", align = "center">
+        <script
+        src="https://code.jquery.com/jquery-3.6.3.js"
+        integrity="sha256-nQLuAZGRRcILA+6dMBOvcRh5Pe310sBpanc6+QBmyVM="
+        crossorigin="anonymous">
+        </script>
+        <script>
+        // function to process the data returned from the API and generate the plot.
+        function process_data(data)
+            {
+            var times = Repeat(data.data.map(entry => entry.to), 18)
+            var regions = data.data.map(entry => entry.regions.map(region => region.shortname)).flat()
+            var forecasts = data.data.map(entry => entry.regions.map(region => region.intensity.forecast)).flat()
+
+            var margin = {top: 10, right: 30, bottom: 30, left: 60},
+                width = 700 - margin.left - margin.right,
+                height = 500 - margin.top - margin.bottom;
+
+            var data = []; // Build data structure accepted by d3
+                for(var i = 0; i < times.length; i++ ) {
+                data.push({date: times[i], value: forecasts[i], name : regions[i]});
+            }
+
+            var svg = d3.select("#get_plot")
+            .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+                .attr("transform",
+                    "translate(" + margin.left + "," + margin.top + ")")
+
+            // List of available regions
+            var allGroup = d3.map(data, function(d){return(d.name)}).keys()
+        
+            // add the options to the button
+            d3.select("#selectButton")
+                .selectAll('myOptions')
+                .data(allGroup)
+                .enter()
+                .append('option')
+                .text(function (d) { return d; }) // text showed in the menu
+                .attr("value", function (d) { return d; }) // corresponding value returned by the button
+                .property("selected", function(d){ return d === "GB"; })
+        
+            // add the x Axis
+            var x = d3.scaleTime()
+                .domain(d3.extent(data, function(d) { return d3.timeParse("%Y-%m-%dT%H:%MZ")(d.date); }))
+                .range([0, width]);
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x));
+        
+            // add the y Axis
+            var y = d3.scaleLinear()
+                        .range([height, 0])
+                        .domain([0, 400]);
+            svg.append("g")
+                .call(d3.axisLeft(y));
+        
+            // filter the data to selection region
+            var _data =  data.filter(function(d){ return d.name == "GB"})
+        
+            // Plot the data
+            var line = svg
+                .append('g')
+                .append("path")
+                .datum(_data)
+                .attr("d", d3.line()
+                .x(function(d) { return x(+d3.timeParse("%Y-%m-%dT%H:%MZ")(d.date)) })
+                .y(function(d) { return y(+d.value) })
+                )
+                .style("fill", "none")
+                .attr("stroke", "steelblue")
+                .style("stroke-width", 2)
+        
+            // Add X axis label:
+            svg.append("text")
+                .attr("text-anchor", "end")
+                .attr("x", width)
+                .attr("y", height + margin.top + 20)
+                .text("Date");
+        
+            // Y axis label:
+            svg.append("text")
+                .attr("text-anchor", "end")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -margin.left+20)
+                .attr("x", -margin.top)
+                .text("Co2 Intensity (gCO2/KWh)")
+        
+            // Define band intervals for colour bands
+            var bands = [
+                {"start":0, "end":44},
+                {"start":45, "end":129},
+                {"start":130, "end":209},
+                {"start":210, "end":310},
+                {"start":310, "end":400},
+            ];
+        
+            var colours = {0:"darkgreen", 45:"lightgreen", 130:"lightyellow", 210:"red", 310:"darkred"}
+            svg.append("g").selectAll("band")
+                .data(bands)
+                .enter().append("rect")
+                .attr("y", d => y(d.end))
+                .attr("height", d => y(d.start) - y(d.end))
+                .attr("x", d => 0)
+                .attr("width", d => width)
+                .style("opacity", 0.15)
+                .style("stroke", "#005e23")
+                .style("fill", function(d){return colours[d.start]});
+                
+                    
+                
+            // function to update the chart when new region selected
+            function updateChart(selectedGroup) {
+                // recompute density estimation
+                var _data =  data.filter(function(d){ return d.name == selectedGroup})
+        
+                // update the chart
+                line
+                .datum(_data)
+                .transition()
+                .duration(500)
+                .attr("d", d3.line()
+                .x(function(d) { return x(+ d3.timeParse("%Y-%m-%dT%H:%MZ")(d.date)) })
+                .y(function(d) { return y(+d.value) })
+                )
+            }
+        
+            // Pay attention to the button
+            d3.select("#selectButton").on("change", function(d){
+                selectedGroup = this.value
+                updateChart(selectedGroup)
+            })
+            
+        }
+
+        // Get the current datetime and fetch the data for the following 48 hours.
+        var today = new Date();
+        var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+        var time = today.getHours() + ":" + today.getMinutes()
+        var dateTime = new Date(date+' '+time)
+        var iso_str = dateTime.toISOString().split(':00.')[0] + 'z';
+
+        const Repeat = (arr, repeats) => arr.map(entry => Array.from({length: repeats}, () => entry)).flat()
+        const fetchPromise = fetch(`https://api.carbonintensity.org.uk/regional/intensity/${iso_str}/fw48h`)
+        .then((response) => response.json()).then(function(_data) {process_data(_data)})
+        
+    </script>
+    </div>
+    <div id = "button", align = "center">
+        <label for="Region">Choose a Region:</label>
+        <select id="selectButton", name="Region"></select>
+    </div>
+</body>
+</html>
