@@ -177,7 +177,7 @@
         var today = new Date();
         var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
         var time = today.getHours() + ":" + today.getMinutes()
-        var dateTime = new Date(date+' '+time)
+        var dateTime = new Date(date.replace(/-/g, "/")+' '+time)
         var iso_str = dateTime.toISOString().split(':00.')[0] + 'z';
 
         const Repeat = (arr, repeats) => arr.map(entry => Array.from({length: repeats}, () => entry)).flat()
