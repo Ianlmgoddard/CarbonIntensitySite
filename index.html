@@ -7,7 +7,7 @@
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
     <style type="text/css">      
       html, body, #container { 
-        width: 100%; height: 100%; margin: 10; padding: 0; 
+        width: 100%; height: 100%; margin: 10; padding: 0;
       }
     </style>
   </head>
@@ -69,6 +69,14 @@
 
             // List of available regions
             var allGroup = d3.map(data, function(d){return(d.name)}).keys()
+
+            var _region_cookie = getCookie('RegionCookie')
+            if (_region_cookie) {
+                var default_region = _region_cookie
+            }
+            else {
+                var default_region = "GB"
+            }
         
             // add the options to the button
             d3.select("#selectButton")
@@ -78,7 +86,7 @@
                 .append('option')
                 .text(function (d) { return d; }) // text showed in the menu
                 .attr("value", function (d) { return d; }) // corresponding value returned by the button
-                .property("selected", function(d){ return d === "GB"; })
+                .property("selected", function(d){ return d === default_region; })
         
             // add the x Axis
             var x = d3.scaleTime()
@@ -96,7 +104,7 @@
                 .call(d3.axisLeft(y));
         
             // filter the data to selection region
-            var _data =  data.filter(function(d){ return d.name == "GB"})
+            var _data =  data.filter(function(d){ return d.name == default_region})
         
             // Plot the data
             var line = svg
@@ -168,6 +176,7 @@
             // Pay attention to the button
             d3.select("#selectButton").on("change", function(d){
                 selectedGroup = this.value
+                setCookie('RegionCookie', this.value, 365)
                 updateChart(selectedGroup)
             })
             
@@ -183,6 +192,29 @@
         const Repeat = (arr, repeats) => arr.map(entry => Array.from({length: repeats}, () => entry)).flat()
         const fetchPromise = fetch(`https://api.carbonintensity.org.uk/regional/intensity/${iso_str}/fw48h`)
         .then((response) => response.json()).then(function(_data) {process_data(_data)})
+
+            // Cookie set and get functions
+        function setCookie(name,value,days) {
+            var expires = "";
+            if (days) {
+                var date = new Date();
+                date.setTime(date.getTime() + (days*24*60*60*1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+        }
+        function getCookie(name) {
+            var nameEQ = name + "=";
+            var ca = document.cookie.split(';');
+            for(var i=0;i < ca.length;i++) {
+                var c = ca[i];
+                while (c.charAt(0)==' ') c = c.substring(1,c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+            }
+            return null;
+        }
+
+
     </script>
     </div>
     <div id = "button", align = "center">
