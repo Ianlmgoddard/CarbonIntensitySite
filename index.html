@@ -5,6 +5,7 @@
     <title>Carbon intensity Plot</title>
     <script src="https://d3js.org/d3.v4.js"></script>
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.16.1.min.js"></script>
     <style type="text/css">      
       html, body, #container { 
         width: 100%; height: 100%; margin: 10; padding: 0;
@@ -40,22 +41,36 @@
     </div>
     <div id="loader" class="center"></div>
     <div id="heading", align="center">
-        <p1>The plot shows the Carbon intensity of the electricity generated for the selected region.
+        <p1>For a given region, the top plot shows the forecasted carbon intensity of electricity generated
+            and the second plot shows the forecast of the generation fuel mix. 
+        </p1>
+        <p2>
             Data comes from the UK National Grid
             <a
                 href="https://carbon-intensity.github.io/api-definitions/?python#carbon-intensity-api-v2-0-0">
                 carbon intensity API
-            </a>. 
-        </p1>
+            </a>.
+        </p2>
 
-        <p1> Want to download the data yourself? Here's a 
+        <p2> Want to download the data yourself? Here's a 
             <a href="https://github.com/Ianlmgoddard/UKCarbonIntensityData.jl">
                 Julia wrapper</a>, and one in 
             <a href="https://github.com/OSUKED/CIDataPortal">
                 python</a>.
-        </p1>
+        </p2>
     </div>
-    <div id = "get_plot", align = "center">
+    <div id="main">
+        <div id="plot">
+          <div class="plot_class" data-num="0">
+            <div class="control-row", align="center", style="margin-top:10px">
+                Region: <select class="regiondata">
+                </select>
+              </div>
+            <div class="plot" id="plotdiv", align="center"></div>
+          </div>
+        </div>
+        <div id="AreaDiv", align="center"></div>
+    </div>
         <script
         src="https://code.jquery.com/jquery-3.6.3.js"
         integrity="sha256-nQLuAZGRRcILA+6dMBOvcRh5Pe310sBpanc6+QBmyVM="
@@ -63,145 +78,149 @@
         </script>
         <script>
         // function to process the data returned from the API and generate the plot.
-        function process_data(data)
-            {
-            var number_of_regions = data.data[0].regions.length
-            var times = Repeat(data.data.map(entry => entry.to), number_of_regions)
-            var regions = data.data.map(entry => entry.regions.map(region => region.shortname)).flat()
-            var forecasts = data.data.map(entry => entry.regions.map(region => region.intensity.forecast)).flat()
+        function _process_data(data) {
 
-            var margin = {top: 10, right: 30, bottom: 30, left: 60},
-                width = 700 - margin.left - margin.right,
-                height = 500 - margin.top - margin.bottom;
+        var number_of_regions = data.data[0].regions.length
+        var times = Repeat(data.data.map(entry => entry.to), number_of_regions)
+        var regions = data.data.map(entry => entry.regions.map(region => region.shortname)).flat()
+        var forecasts = data.data.map(entry => entry.regions.map(region => region.intensity.forecast)).flat()
+        var generation_mix_percents = data.data.map(entry => entry.regions.map(region => region.generationmix.map(mix => mix.perc))).flat()
+        var generation_mix_sources = data.data.map(entry => entry.regions.map(region => region.generationmix.map(mix => mix.fuel))).flat()
 
-            var data = []; // Build data structure accepted by d3
-                for(var i = 0; i < times.length; i++ ) {
-                data.push({date: times[i], value: forecasts[i], name : regions[i]});
+        var list_of_regions = []
+        for (var i = 0; i < regions.length; i++ ){
+            if (list_of_regions.indexOf(regions[i]) === -1 ){
+                list_of_regions.push(regions[i]);
             }
+        }
 
-            var svg = d3.select("#get_plot")
-            .append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-            .append("g")
-                .attr("transform",
-                    "translate(" + margin.left + "," + margin.top + ")")
+        function getRegionData(chosenRegion) {
+            current_forecasts = [];
+            current_times = [];
+            current_mixes = [];
+            current_fuels = [];
+            for (var i = 0 ; i < regions.length ; i++){
+                if ( regions[i] === chosenRegion ) {
+                    current_forecasts.push(forecasts[i]);
+                    current_times.push(times[i]);
+                    current_mixes.push(generation_mix_percents[i])
+                    current_fuels.push(generation_mix_sources[i])
+                }
+            }
+        };
 
-            // List of available regions
-            var allGroup = d3.map(data, function(d){return(d.name)}).keys()
-
-            var _region_cookie = getCookie('RegionCookie')
+        // Default Region Data
+        var _region_cookie = getCookie('RegionCookie')
             if (_region_cookie) {
                 var default_region = _region_cookie
             }
             else {
                 var default_region = "GB"
             }
-        
-            // add the options to the button
-            d3.select("#selectButton")
-                .selectAll('myOptions')
-                .data(allGroup)
-                .enter()
-                .append('option')
-                .text(function (d) { return d; }) // text showed in the menu
-                .attr("value", function (d) { return d; }) // corresponding value returned by the button
-                .property("selected", function(d){ return d === default_region; })
-        
-            // add the x Axis
-            var x = d3.scaleTime()
-                .domain(d3.extent(data, function(d) { return d3.timeParse("%Y-%m-%dT%H:%MZ")(d.date); }))
-                .range([0, width]);
-            svg.append("g")
-                .attr("transform", "translate(0," + height + ")")
-                .call(d3.axisBottom(x));
-        
-            // add the y Axis
-            var y = d3.scaleLinear()
-                        .range([height, 0])
-                        .domain([0, 400]);
-            svg.append("g")
-                .call(d3.axisLeft(y));
-        
-            // filter the data to selection region
-            var _data =  data.filter(function(d){ return d.name == default_region})
-        
-            // Plot the data
-            var line = svg
-                .append('g')
-                .append("path")
-                .datum(_data)
-                .attr("d", d3.line()
-                .x(function(d) { return x(+d3.timeParse("%Y-%m-%dT%H:%MZ")(d.date)) })
-                .y(function(d) { return y(+d.value) })
-                )
-                .style("fill", "none")
-                .attr("stroke", "steelblue")
-                .style("stroke-width", 2)
-        
-            // Add X axis label:
-            svg.append("text")
-                .attr("text-anchor", "end")
-                .attr("x", width)
-                .attr("y", height + margin.top + 20)
-                .text("Date");
-        
-            // Y axis label:
-            svg.append("text")
-                .attr("text-anchor", "end")
-                .attr("transform", "rotate(-90)")
-                .attr("y", -margin.left+20)
-                .attr("x", -margin.top)
-                .text("Co2 Intensity (gCO2/kWh)")
-        
-            // Define band intervals for colour bands
-            var bands = [
-                {"start":0, "end":44},
-                {"start":45, "end":129},
-                {"start":130, "end":209},
-                {"start":210, "end":310},
-                {"start":310, "end":400},
-            ];
-        
-            var colours = {0:"darkgreen", 45:"lightgreen", 130:"lightyellow", 210:"red", 310:"darkred"}
-            svg.append("g").selectAll("band")
-                .data(bands)
-                .enter().append("rect")
-                .attr("y", d => y(d.end))
-                .attr("height", d => y(d.start) - y(d.end))
-                .attr("x", d => 0)
-                .attr("width", d => width)
-                .style("opacity", 0.15)
-                .style("stroke", "#005e23")
-                .style("fill", function(d){return colours[d.start]});
-                
-                    
-                
-            // function to update the chart when new region selected
-            function updateChart(selectedGroup) {
-                // recompute density estimation
-                var _data =  data.filter(function(d){ return d.name == selectedGroup})
-        
-                // update the chart
-                line
-                .datum(_data)
-                .transition()
-                .duration(500)
-                .attr("d", d3.line()
-                .x(function(d) { return x(+ d3.timeParse("%Y-%m-%dT%H:%MZ")(d.date)) })
-                .y(function(d) { return y(+d.value) })
-                )
-            }
-        
-            // Pay attention to the button
-            d3.select("#selectButton").on("change", function(d){
-                selectedGroup = this.value
-                setCookie('RegionCookie', this.value, 365)
-                updateChart(selectedGroup)
-            })
+        setPlot(default_region);
 
-            document.querySelector("#loader").style.visibility = "hidden"
-            
+        function setPlot(chosenRegion) {
+            setCookie('RegionCookie', chosenRegion, 365)
+            getRegionData(chosenRegion);
+
+            var trace1 = {
+                x: current_times,
+                y: current_forecasts,
+                mode: 'lines',
+                line: {
+                    color: 'rgb(128, 0, 128)',
+                    width: 2
+                }
+            };
+
+            var __data = [trace1];
+
+            var layout = {
+                height: 500,
+                width: 1000,  
+                yaxis: {
+                    automargin: true,
+                    title: {
+                        text: "CO2 Intensity (gCO2/KWh)",
+                        standoff: 40
+                    }
+                },
+                title: {
+                    text:'Forecast CO2 Intensity',
+                }
+            };
+
+            Plotly.newPlot('plotdiv', __data, layout);
+        };
+
+        var innerContainer = document.querySelector('[data-num="0"'),
+            plotEl = innerContainer.querySelector('.plot'),
+            regionSelector = innerContainer.querySelector('.regiondata');
+
+        function assignOptions(textArray, selector) {
+            for (var i = 0; i < textArray.length;  i++) {
+                var currentOption = document.createElement('option');
+                currentOption.text = textArray[i];
+                selector.appendChild(currentOption);
+            }
+        }
+
+        list_of_regions.sort(function(x,y){ return x == default_region ? -1 : y == default_region ? 1 : 0; })
+        assignOptions(list_of_regions, regionSelector);
+
+        function updateRegion(){
+            setPlot(regionSelector.value);
+            setAreaPlot(regionSelector.value)
+        }
+
+        regionSelector.addEventListener('change', updateRegion, false);
+        ;
+
+
+        function setAreaPlot(chosenRegion) {
+            fuels = current_fuels[1]
+            var traces = []
+            for (var i = 0; i < current_mixes[1].length;  i++) {
+                if (i === 0) { var _setting = 'tozeroy'
+                    }
+                else {
+                    var _setting = 'tonexty'
+                }
+                _trace = {x: current_times, y: current_mixes.map(entry => entry[i]), fill: _setting, name:fuels[i], hoverinfo: 'none'}
+                traces.push(_trace)
+                }
+
+            function stackedArea(traces) {
+                var i, j;
+                for(i=1; i<traces.length; i++) {
+                    for(j=0; j<(Math.min(traces[i]['y'].length, traces[i-1]['y'].length)); j++) {
+                        traces[i]['y'][j] += traces[i-1]['y'][j];
+                    }
+                }
+                return traces;
+            }
+
+            var _layout = {
+                height: 500,
+                width: 1000,  
+                yaxis: {
+                    automargin: true,
+                    title: {
+                        text: "Fuel Mix Percent",
+                        standoff: 10
+                    }
+                },
+                hovermode: false,
+                title: {
+                    text:'Forecast generation mix (%)',
+                }
+            };
+
+            Plotly.newPlot('AreaDiv', stackedArea(traces), _layout);  
+        }
+        setAreaPlot(default_region)
+
+        document.querySelector("#loader").style.visibility = "hidden"
         }
 
         // add the loader 
@@ -216,9 +235,9 @@
 
         const Repeat = (arr, repeats) => arr.map(entry => Array.from({length: repeats}, () => entry)).flat()
         const fetchPromise = fetch(`https://api.carbonintensity.org.uk/regional/intensity/${iso_str}/fw48h`)
-        .then((response) => response.json()).then(function(_data) {process_data(_data)})
+        .then((response) => response.json()).then(function(_data) {_process_data(_data)})
 
-            // Cookie set and get functions
+        // Cookie set and get functions
         function setCookie(name,value,days) {
             var expires = "";
             if (days) {
@@ -238,13 +257,6 @@
             }
             return null;
         }
-
-
     </script>
-    </div>
-    <div id = "button", align = "center">
-        <label for="Region">Choose a Region:</label>
-        <select id="selectButton", name="Region"></select>
-    </div>
 </body>
 </html>
