@@ -130,7 +130,9 @@
                 line: {
                     color: 'rgb(128, 0, 128)',
                     width: 2
-                }
+                },
+                hovertemplate: 'Intensity: %{y:.0f}' +
+                        '<br>Time: %{x}<br><extra></extra>'
             };
 
             var __data = [trace1];
@@ -186,7 +188,13 @@
                 else {
                     var _setting = 'tonexty'
                 }
-                _trace = {x: current_times, y: current_mixes.map(entry => entry[i]), name:fuels[i]}
+                _trace = {
+                    x: current_times,
+                    y: current_mixes.map(entry => entry[i]),
+                    name:fuels[i],
+                    hovertemplate: '<b>%{data.name}</b><br>' + 'Percentage: %{y:.2f}\%' +
+                        '<br>Time: %{x}<br><extra></extra>',
+                    }
                 traces.push(_trace)
                 }
 
