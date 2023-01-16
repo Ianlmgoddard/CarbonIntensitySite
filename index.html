@@ -130,7 +130,9 @@
                 line: {
                     color: 'rgb(128, 0, 128)',
                     width: 2
-                }
+                },
+                hovertemplate: 'Intensity: %{y:.0f}' +
+                        '<br>Time: %{x}<br><extra></extra>'
             };
 
             var __data = [trace1];
@@ -181,12 +183,13 @@
             fuels = current_fuels[1]
             var traces = []
             for (var i = 0; i < current_mixes[1].length;  i++) {
-                if (i === 0) { var _setting = 'tozeroy'
+                _trace = {
+                    x: current_times,
+                    y: current_mixes.map(entry => entry[i]),
+                    name:fuels[i],
+                    hovertemplate: '<b>%{data.name}</b><br>' + 'Percentage: %{y:.2f}\%' +
+                        '<br>Time: %{x}<br><extra></extra>',
                     }
-                else {
-                    var _setting = 'tonexty'
-                }
-                _trace = {x: current_times, y: current_mixes.map(entry => entry[i]), fill: _setting, name:fuels[i], hoverinfo: 'none'}
                 traces.push(_trace)
                 }
 
@@ -210,13 +213,12 @@
                         standoff: 10
                     }
                 },
-                hovermode: false,
                 title: {
                     text:'Forecast generation mix (%)',
                 }
             };
 
-            Plotly.newPlot('AreaDiv', stackedArea(traces), _layout);  
+            Plotly.newPlot('AreaDiv', traces, _layout);  
         }
         setAreaPlot(default_region)
 
