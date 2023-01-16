@@ -186,7 +186,7 @@
                 else {
                     var _setting = 'tonexty'
                 }
-                _trace = {x: current_times, y: current_mixes.map(entry => entry[i]), fill: _setting, name:fuels[i], hoverinfo: 'none'}
+                _trace = {x: current_times, y: current_mixes.map(entry => entry[i]), name:fuels[i]}
                 traces.push(_trace)
                 }
 
@@ -210,13 +210,12 @@
                         standoff: 10
                     }
                 },
-                hovermode: false,
                 title: {
                     text:'Forecast generation mix (%)',
                 }
             };
 
-            Plotly.newPlot('AreaDiv', stackedArea(traces), _layout);  
+            Plotly.newPlot('AreaDiv', traces, _layout);  
         }
         setAreaPlot(default_region)
 
