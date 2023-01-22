@@ -7,8 +7,8 @@
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.16.1.min.js"></script>
     <style type="text/css">      
-      html, body, #container { 
-        width: 100%; height: 100%; margin: 10; padding: 0;
+      html, body{padding-bottom: 10px;}, #container { 
+        width: 70%; height: 100%; margin: 0 auto; display: block;
       }
       #loader {
             border: 12px solid #f3f3f3;
@@ -41,23 +41,9 @@
     </div>
     <div id="loader" class="center"></div>
     <div id="heading", align="center">
-        <p1>For a given region, the top plot shows the forecasted carbon intensity of electricity generated
+        <p>For a given region, the top plot shows the forecasted carbon intensity of electricity generated
             and the second plot shows the forecast of the generation fuel mix. 
-        </p1>
-        <p2>
-            Data comes from the UK National Grid
-            <a
-                href="https://carbon-intensity.github.io/api-definitions/?python#carbon-intensity-api-v2-0-0">
-                carbon intensity API
-            </a>.
-        </p2>
-
-        <p2> Want to download the data yourself? Here's a 
-            <a href="https://github.com/Ianlmgoddard/UKCarbonIntensityData.jl">
-                Julia wrapper</a>, and one in 
-            <a href="https://github.com/OSUKED/CIDataPortal">
-                python</a>.
-        </p2>
+        </p>
     </div>
     <div id="main">
         <div id="plot">
@@ -149,10 +135,16 @@
                 },
                 title: {
                     text:'Forecast CO2 Intensity',
-                }
+                },
+                dragmode:false 
             };
 
-            Plotly.newPlot('plotdiv', __data, layout);
+            config = {
+                displayModeBar: true,
+                scrollZoom:true
+            }
+
+            Plotly.newPlot('plotdiv', __data, layout, config);
         };
 
         var innerContainer = document.querySelector('[data-num="0"'),
@@ -215,10 +207,16 @@
                 },
                 title: {
                     text:'Forecast generation mix (%)',
-                }
+                },
+                dragmode:false, 
             };
 
-            Plotly.newPlot('AreaDiv', traces, _layout);  
+            config = {
+                displayModeBar: true,
+                scrollZoom:true
+            }
+
+            Plotly.newPlot('AreaDiv', traces, _layout, config);  
         }
         setAreaPlot(default_region)
 
@@ -260,5 +258,25 @@
             return null;
         }
     </script>
+    <div id="heading", align="center">
+        <p>
+            Data comes from the UK National Grid
+            <a
+                href="https://carbon-intensity.github.io/api-definitions/?python#carbon-intensity-api-v2-0-0">
+                carbon intensity API</a>.
+        </p>
+        <p> Want to download the data yourself? Here's a 
+            <a href="https://github.com/Ianlmgoddard/UKCarbonIntensityData.jl">
+                Julia wrapper</a>, and one in 
+            <a href="https://github.com/OSUKED/CIDataPortal">
+                python</a>.
+        </p>
+        <p> If you have any questions or ideas on improvements, feel free to reach out to me on
+            <a href="https://twitter.com/Ian_lmgoddard">
+                twitter</a>, or post an issue on
+            <a href="https://github.com/Ianlmgoddard/CarbonIntensitySite">
+                github</a>.
+        </p>
+    </div>
 </body>
 </html>
