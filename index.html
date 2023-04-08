@@ -66,8 +66,13 @@
         // function to process the data returned from the API and generate the plot.
         function _process_data(data) {
 
+        // transform times from UTC to local time.
+        function convertTZ(date) {
+            return new Date(typeof date === "string" ? new Date(date) : date);   
+        }
+
         var number_of_regions = data.data[0].regions.length
-        var times = Repeat(data.data.map(entry => entry.to), number_of_regions)
+        var times = Repeat(data.data.map(entry => convertTZ(entry.to)), number_of_regions)
         var regions = data.data.map(entry => entry.regions.map(region => region.shortname)).flat()
         var forecasts = data.data.map(entry => entry.regions.map(region => region.intensity.forecast)).flat()
         var generation_mix_percents = data.data.map(entry => entry.regions.map(region => region.generationmix.map(mix => mix.perc))).flat()
