@@ -1,294 +1,440 @@
 <!DOCTYPE html>
-<meta charset="utf-8">
-<html>
-  <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YCWQV8YEKG"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>UK Carbon Intensity — Interactive Forecast</title>
+  <meta name="description" content="Interactive UK carbon intensity forecast."/>
+  <script src="https://cdn.plot.ly/plotly-2.30.1.min.js"></script>
+  <style>
+    :root{--bg:#0b1020;--card:#121a31;--text:#e8ecf4;--muted:#9fb0ca;--accent:#6aa2ff;--accent2:#7c5cff;--ring:rgba(106,162,255,.45);--radius:16px;--maxw:1200px}
+    @media (prefers-color-scheme: light){
+      :root{--bg:#f6f8fc;--card:#fff;--text:#171a1f;--muted:#546178;--accent:#2b6eff;--accent2:#7c5cff;--ring:rgba(43,110,255,.25)}
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:radial-gradient(1100px 700px at 10% -10%,rgba(124,92,255,.18),transparent 35%),radial-gradient(900px 600px at 100% 0%,rgba(106,162,255,.18),transparent 45%),var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial}
+    .container{max-width:var(--maxw);margin:0 auto;padding:24px;display:grid;gap:18px}
+    header{text-align:center}
+    header h1{margin:0 0 6px;font-size:clamp(1.6rem,2vw+1rem,2.3rem)}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0));backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);box-shadow:0 10px 30px rgba(0,0,0,.2)}
+    .panel{padding:14px 16px}
+    .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;border-bottom:1px solid rgba(255,255,255,.08);padding:10px 14px}
+    label{color:var(--muted);font-weight:600;letter-spacing:.2px}
+    select{appearance:none;background:var(--card);color:var(--text);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:10px 12px;outline:none;transition:box-shadow .2s,border-color .2s}
+    select:focus{border-color:var(--accent);box-shadow:0 0 0 6px var(--ring)}
+    .charts{display:grid;grid-template-columns:1fr;gap:16px}
+    .chart{width:100%;min-height:360px}
+    .summary{display:grid;gap:10px;justify-items:center;text-align:center}
+    .kpis{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+    .kpi{min-width:220px}
+    .kpi h3{margin:0 0 2px;font-size:1.7rem}
+    .kpi span{color:var(--muted);font-size:.92rem}
+    .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 10px}
+    .pill{display:inline-flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.2px}
+    .pill-green{background:rgba(106,162,255,.18);border:1px solid var(--accent);color:var(--text);padding:6px 10px;border-radius:999px}
+    .status{text-align:center;color:var(--muted);font-size:.95rem;padding:6px}
+    .backdrop{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,16,32,.55);backdrop-filter:blur(3px);z-index:10;transition:opacity .25s,visibility .25s}
+    .backdrop.hidden{opacity:0;visibility:hidden}
+    .spinner{width:72px;height:72px;border:6px solid rgba(255,255,255,.25);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;box-shadow:0 0 0 4px rgba(0,0,0,.12) inset}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .sr-only{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+    .subcontrols{display:flex;flex-direction:column;gap:8px;padding:8px 0 4px;align-items:stretch}
+    .hint{font-size:.9rem}
 
-        gtag('config', 'G-YCWQV8YEKG');
-    </script>
-    <title>Carbon intensity Plot</title>
-    <script src="https://d3js.org/d3.v4.js"></script>
-    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-2.16.1.min.js"></script>
-    <style type="text/css">      
-      html, body{padding-bottom: 10px;}, #container { 
-        width: 70%; height: 100%; margin: 0 auto; display: block;
-      }
-      #loader {
-            border: 12px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 12px solid #444444;
-            width: 70px;
-            height: 70px;
-            animation: spin 1s linear infinite;
-        }
-          
-        @keyframes spin {
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-          
-        .center {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            margin: auto;
-        }
-    </style>
-  </head>
-  <body>
-    <div id="heading", align="center">
-        <h1>48 hour carbon intensity forecast</h1>
-    </div>
-    <div id="loader" class="center"></div>
-    <div id="heading", align="center">
-        <p>For a given region, the top plot shows the forecasted carbon intensity of electricity generated
-            and the second plot shows the forecast of the generation fuel mix. 
-        </p>
-    </div>
-    <div id="main">
-        <div id="plot">
-          <div class="plot_class" data-num="0">
-            <div class="control-row", align="center", style="margin-top:10px">
-                Region: <select class="regiondata">
-                </select>
-              </div>
-            <div class="plot" id="plotdiv", align="center"></div>
+    .compare-control{display:grid;gap:10px;width:100%}
+    .compare-grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+    .toggle{
+      display:flex;align-items:center;justify-content:center;padding:8px 10px;border-radius:12px;cursor:pointer;
+      border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);user-select:none;transition:transform .05s,border-color .2s
+    }
+    .toggle:hover{border-color:var(--accent)}
+    .toggle[aria-pressed="true"]{background:rgba(106,162,255,.15);border-color:var(--accent)}
+    .toggle[disabled]{opacity:.5;cursor:not-allowed}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;min-height:28px}
+    .chip{
+      display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.14);font-size:.92rem
+    }
+    .chip button{border:none;background:transparent;color:inherit;cursor:pointer;padding:0 2px;line-height:1}
+    .subcontrols select[hidden]{display:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>48-Hour Carbon Intensity Forecast</h1>
+    </header>
+
+    <section class="card panel" aria-labelledby="summary-title">
+      <h2 id="summary-title" class="sr-only">Selected region summary</h2>
+      <div class="summary" id="summary">
+        <span class="pill pill-green" id="greenestLabel">Greenest 3-hour window</span>
+        <div class="kpis">
+          <div class="kpi">
+            <h3 id="kpi-time">—</h3>
+            <span>Window time</span>
+          </div>
+          <div class="kpi">
+            <h3 id="kpi-intensity">—</h3>
+            <span>Avg intensity (gCO₂/kWh)</span>
+          </div>
+          <div class="kpi">
+            <h3 id="kpi-renew">—</h3>
+            <span>Avg renewables (%)</span>
           </div>
         </div>
-        <div id="AreaDiv", align="center"></div>
-    </div>
-        <script
-        src="https://code.jquery.com/jquery-3.6.3.js"
-        integrity="sha256-nQLuAZGRRcILA+6dMBOvcRh5Pe310sBpanc6+QBmyVM="
-        crossorigin="anonymous">
-        </script>
-        <script>
-        // function to process the data returned from the API and generate the plot.
-        function _process_data(data) {
+        <span class="badge"><strong id="kpi-region">—</strong></span>
+      </div>
+    </section>
 
-        // transform times from UTC to local time.
-        function convertTZ(date) {
-            return new Date(typeof date === "string" ? new Date(date) : date);   
+    <section class="card" aria-labelledby="controls-heading">
+      <div class="controls">
+        <h2 id="controls-heading" class="sr-only">Controls</h2>
+        <label for="region">Region</label>
+        <select id="region"></select>
+      </div>
+
+      <div class="panel charts">
+        <div id="intensityChart" class="chart" aria-label="Carbon intensity"></div>
+        <div id="mixChart" class="chart" aria-label="Generation mix"></div>
+
+        <div class="subcontrols">
+          <label>Compare regions</label>
+          <div id="compareControl" class="compare-control">
+            <div id="compareChips" class="chips" aria-live="polite"></div>
+            <div id="compareGrid" class="compare-grid" role="group" aria-label="Region toggles"></div>
+            <div class="hint muted">
+              <span id="compareCount">0</span>/5 selected ·
+              <button id="clearCompare" type="button">Clear</button>
+            </div>
+          </div>
+          <select id="compare" multiple hidden></select>
+        </div>
+
+        <div id="compareChart" class="chart" aria-label="Regional comparison"></div>
+        <div class="status" id="status"></div>
+      </div>
+    </section>
+
+    <section class="card panel">
+      <div class="links" style="text-align:center">
+        Data: UK National Grid
+        <a href="https://carbon-intensity.github.io/api-definitions/?python#carbon-intensity-api-v2-0-0" target="_blank" rel="noopener">Carbon Intensity API</a> ·
+        <a href="https://github.com/Ianlmgoddard/UKCarbonIntensityData.jl" target="_blank" rel="noopener">Julia wrapper</a> ·
+        <a href="https://github.com/OSUKED/CIDataPortal" target="_blank" rel="noopener">Python wrapper</a> ·
+        <a href="https://github.com/Ianlmgoddard/CarbonIntensitySite" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </section>
+  </div>
+
+  <div id="backdrop" class="backdrop" role="status" aria-live="assertive" aria-label="Loading data">
+    <div class="spinner" title="Loading"></div>
+  </div>
+
+  <script>
+  (function(){
+    const qs = (s, el=document)=>el.querySelector(s);
+    const statusEl = qs('#status');
+    const regionSel = qs('#region');
+    const kpiRegion = qs('#kpi-region');
+    const kpiTime = qs('#kpi-time');
+    const kpiInt = qs('#kpi-intensity');
+    const kpiRen = qs('#kpi-renew');
+    const backdrop = qs('#backdrop');
+
+    const setCookie = (k,v,d=365)=>{const t=new Date();t.setTime(t.getTime()+d*24*60*60*1000);document.cookie=`${k}=${encodeURIComponent(v)}; expires=${t.toUTCString()}; path=/`};
+    const getCookie = (k)=>{const p=`${k}=`;return document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith(p))?.slice(p.length)||null};
+
+    const showLoading=(on=true)=>{backdrop.classList.toggle('hidden',!on);statusEl.textContent=on?'Loading forecast…':'';statusEl.classList.remove('error')};
+    const showError=(msg)=>{backdrop.classList.add('hidden');statusEl.textContent=msg;statusEl.classList.add('error')};
+
+    const now = new Date();
+    const start = new Date(now.getFullYear(),now.getMonth(),now.getDate(),now.getHours(),0,0);
+    const iso = start.toISOString().split(':00.')[0]+'z';
+    const API = `https://api.carbonintensity.org.uk/regional/intensity/${iso}/fw48h`;
+
+    let times=[], regions=[], forecasts=[], mixes=[], fuels=[], regionList=[];
+    let current = {times:[],forecasts:[],mixes:[],fuels:[]};
+    let idxNow = 0;
+
+    const Repeat = (arr, repeats)=>arr.map(x=>Array.from({length:repeats},()=>x)).flat();
+    const isRenewable = (fuel)=>['wind','solar','hydro','biomass'].includes(String(fuel||'').toLowerCase());
+
+    function nearestIndex(dateArr, ref){
+      let best=0, bestDiff=Infinity;
+      for(let i=0;i<dateArr.length;i++){
+        const d=Math.abs(dateArr[i]-ref);
+        if(d<bestDiff){best=i;bestDiff=d;}
+      }
+      return best;
+    }
+
+    async function loadAll(){
+      showLoading(true);
+      try{
+        const curRes = await fetch(API,{cache:"no-store"});
+        if(!curRes.ok) throw new Error('API error');
+        const cur = await curRes.json();
+
+        const n = cur.data[0].regions.length;
+        times   = Repeat(cur.data.map(d=>new Date(d.to)), n);
+        regions = cur.data.flatMap(d=>d.regions.map(r=>r.shortname));
+        forecasts = cur.data.flatMap(d=>d.regions.map(r=>r.intensity.forecast));
+        mixes = cur.data.flatMap(d=>d.regions.map(r=>r.generationmix.map(m=>m.perc)));
+        fuels = cur.data.flatMap(d=>d.regions.map(r=>r.generationmix.map(m=>m.fuel)));
+
+        regionList = [...new Set(regions)].sort();
+
+        initControls();
+
+        const steps = times.length / regionList.length;
+        const blockTimes = times.slice(0, steps);
+        idxNow = nearestIndex(blockTimes, start);
+
+        const cookieRegion = getCookie('RegionCookie');
+        const defRegion = cookieRegion && regionList.includes(cookieRegion) ? cookieRegion : (regionList.includes('GB') ? 'GB' : regionList[0]);
+        regionSel.value = defRegion;
+        sliceForRegion(defRegion);
+
+        updateSummaryForRegion(defRegion);
+        drawAll();
+        showLoading(false);
+      }catch(e){
+        console.error(e);
+        showError('Unable to load data right now.');
+      }
+    }
+
+    function initControls(){
+      regionSel.innerHTML = regionList.map(r=>`<option value="${r}">${r}</option>`).join('');
+      buildCompareGrid();
+      regionSel.addEventListener('change', ()=>{
+        setCookie('RegionCookie', regionSel.value);
+        sliceForRegion(regionSel.value);
+        onSelectedRegionChanged();
+        updateSummaryForRegion(regionSel.value);
+        drawAll();
+      });
+    }
+
+    function sliceForRegion(region){
+      const t=[], f=[], m=[], fu=[];
+      for(let i=0;i<regions.length;i++){
+        if(regions[i]===region){
+          t.push(times[i]); f.push(forecasts[i]); m.push(mixes[i]); fu.push(fuels[i]);
+        }
+      }
+      current={times:t,forecasts:f,mixes:m,fuels:fu};
+    }
+
+    function findBestWindow(arr, window=3){
+      if(arr.length===0) return null;
+      let bestIdx=0, best=Infinity;
+      for(let i=0;i<=arr.length-window;i++){
+        let s=0; for(let j=0;j<window;j++) s+=arr[i+j];
+        const avg=s/window;
+        if(avg<best){best=avg;bestIdx=i;}
+      }
+      return {start:bestIdx, end:bestIdx+window-1, avg:best};
+    }
+
+    function avgRenewablesShare(startIdx, endIdx){
+      const fuelsRow = current.fuels[0] || [];
+      let total = 0;
+      const len = Math.max(1, endIdx - startIdx + 1);
+      for(let i=startIdx;i<=endIdx;i++){
+        const mixRow = current.mixes[i] || [];
+        let ren = 0;
+        for(let k=0;k<mixRow.length;k++){
+          if(isRenewable(fuelsRow[k])) ren += mixRow[k] || 0;
+        }
+        total += ren;
+      }
+      return total / len;
+    }
+
+    function formatWindowLabel(startIdx, endIdx){
+      const t0 = current.times[startIdx];
+      const t1 = current.times[endIdx];
+      if(!t0 || !t1) return '—';
+      const tf = {hour:'2-digit', minute:'2-digit'};
+      const df = {weekday:'short', day:'2-digit', month:'short'};
+      return `${t0.toLocaleTimeString([], tf)}–${t1.toLocaleTimeString([], tf)} · ${t0.toLocaleDateString([], df)}`;
+    }
+
+    function updateSummaryForRegion(region){
+      const best = findBestWindow(current.forecasts, 3);
+      if(best){
+        const avgInt = best.avg;
+        const avgRen = avgRenewablesShare(best.start, best.end);
+        kpiTime.textContent = formatWindowLabel(best.start, best.end);
+        kpiRegion.textContent = region || '—';
+        kpiInt.textContent = isFinite(avgInt) ? Math.round(avgInt).toString() : '—';
+        kpiRen.textContent = isFinite(avgRen) ? Math.round(avgRen).toString() : '—';
+      }else{
+        const i = Math.min(idxNow, current.forecasts.length-1);
+        const mixRow = current.mixes[i] || [];
+        const fuelsRow = current.fuels[0] || [];
+        let ren=0; for(let k=0;k<mixRow.length;k++){ if(isRenewable(fuelsRow[k])) ren+=mixRow[k]||0; }
+        kpiTime.textContent = current.times[i] ? current.times[i].toLocaleString() : '—';
+        kpiRegion.textContent = region || '—';
+        kpiInt.textContent = current.forecasts[i]!=null ? Math.round(current.forecasts[i]).toString() : '—';
+        kpiRen.textContent = isFinite(ren) ? Math.round(ren).toString() : '—';
+      }
+    }
+
+    function drawIntensity(){
+        const best = findBestWindow(current.forecasts, 3);
+        const shapes = [];
+        const annotations = [];
+        if(best){
+            const x0 = current.times[best.start], x1 = current.times[best.end];
+            shapes.push({
+            type:'rect', xref:'x', yref:'paper',
+            x0, x1, y0:0, y1:1,
+            fillcolor:'rgba(106,162,255,.12)', line:{width:0}
+            });
+            annotations.push({
+            x:x0, y:1.08, xref:'x', yref:'paper',
+            showarrow:false,
+            text:`Greener window (~${Math.round(best.avg)} gCO₂/kWh)`,
+            font:{size:12}
+            });
         }
 
-        var number_of_regions = data.data[0].regions.length
-        var times = Repeat(data.data.map(entry => convertTZ(entry.to)), number_of_regions)
-        var regions = data.data.map(entry => entry.regions.map(region => region.shortname)).flat()
-        var forecasts = data.data.map(entry => entry.regions.map(region => region.intensity.forecast)).flat()
-        var generation_mix_percents = data.data.map(entry => entry.regions.map(region => region.generationmix.map(mix => mix.perc))).flat()
-        var generation_mix_sources = data.data.map(entry => entry.regions.map(region => region.generationmix.map(mix => mix.fuel))).flat()
-
-        var list_of_regions = []
-        for (var i = 0; i < regions.length; i++ ){
-            if (list_of_regions.indexOf(regions[i]) === -1 ){
-                list_of_regions.push(regions[i]);
-            }
-        }
-
-        function getRegionData(chosenRegion) {
-            current_forecasts = [];
-            current_times = [];
-            current_mixes = [];
-            current_fuels = [];
-            for (var i = 0 ; i < regions.length ; i++){
-                if ( regions[i] === chosenRegion ) {
-                    current_forecasts.push(forecasts[i]);
-                    current_times.push(times[i]);
-                    current_mixes.push(generation_mix_percents[i])
-                    current_fuels.push(generation_mix_sources[i])
-                }
-            }
+        const trace = {
+            x: current.times, y: current.forecasts,
+            mode:'lines', type:'scatter',
+            line:{width:2},
+            hovertemplate:'Intensity: %{y:.0f} gCO₂/kWh<br>Time: %{x}<extra></extra>'
         };
 
-        // Default Region Data
-        var _region_cookie = getCookie('RegionCookie')
-            if (_region_cookie) {
-                var default_region = _region_cookie
-            }
-            else {
-                var default_region = "GB"
-            }
-        setPlot(default_region);
+        Plotly.newPlot('intensityChart', [trace], {
+            title:{text:`Forecast CO₂ Intensity — ${regionSel.value}`, x:0.01},
+            margin:{l:60,r:20,t:50,b:50},
+            yaxis:{title:'gCO₂/kWh', automargin:true},
+            xaxis:{title:'Time', tickformat:'%H:%M<br>%a %d %b'},
+            shapes, annotations
+        }, {displayModeBar:true, responsive:true});
+    }
 
-        function setPlot(chosenRegion) {
-            setCookie('RegionCookie', chosenRegion, 365)
-            getRegionData(chosenRegion);
 
-            var trace1 = {
-                x: current_times,
-                y: current_forecasts,
-                mode: 'lines',
-                line: {
-                    color: 'rgb(128, 0, 128)',
-                    width: 2
-                },
-                hovertemplate: 'Intensity: %{y:.0f}' +
-                        '<br>Time: %{x}<br><extra></extra>'
-            };
+    function drawMix(){
+      const fuelsAtT1 = current.fuels[0] || [];
+      const traces = fuelsAtT1.map((fuelName, idx)=>({
+        x: current.times, y: current.mixes.map(row=>row[idx]), name: fuelName,
+        type:'scatter', mode:'lines', stackgroup:'one', groupnorm:'percent',
+        hovertemplate:`<b>${fuelName}</b><br>%: %{y:.2f}<br>Time: %{x}<extra></extra>`
+      }));
 
-            var __data = [trace1];
+      Plotly.newPlot('mixChart', traces, {
+        title:{text:`Generation Mix (%) — ${regionSel.value}`, x:0.01},
+        margin:{l:60,r:20,t:50,b:50},
+        yaxis:{title:'Percent', ticksuffix:'%', range:[0,100], automargin:true},
+        xaxis:{title:'Time', tickformat:'%H:%M<br>%a %d %b'},
+        legend:{orientation:'h', y:-0.2}
+      }, {displayModeBar:true, responsive:true});
+    }
 
-            var layout = {
-                height: 500,
-                width: 1000,  
-                yaxis: {
-                    automargin: true,
-                    title: {
-                        text: "CO2 Intensity (gCO2/KWh)",
-                        standoff: 40
-                    }
-                },
-                title: {
-                    text:`Forecast CO2 Intensity: ${chosenRegion}`,
-                },
-                dragmode:false 
-            };
+    function drawComparison(){
+      const selected = Array.from(selectedRegions);
+      const traces = [];
+      const fullTimes = times.filter((_, i) => i % regionList.length === 0);
 
-            config = {
-                displayModeBar: true,
-            }
-
-            Plotly.newPlot('plotdiv', __data, layout, config);
-        };
-
-        var innerContainer = document.querySelector('[data-num="0"'),
-            plotEl = innerContainer.querySelector('.plot'),
-            regionSelector = innerContainer.querySelector('.regiondata');
-
-        function assignOptions(textArray, selector) {
-            for (var i = 0; i < textArray.length;  i++) {
-                var currentOption = document.createElement('option');
-                currentOption.text = textArray[i];
-                selector.appendChild(currentOption);
-            }
+      for (const r of selected) {
+        const ys = [];
+        for (let i = 0; i < regions.length; i++) {
+          if (regions[i] === r) ys.push(forecasts[i]);
         }
+        traces.push({ x: fullTimes, y: ys, name: r, type: 'scatter', mode: 'lines' });
+      }
 
-        list_of_regions.sort(function(x,y){ return x == default_region ? -1 : y == default_region ? 1 : 0; })
-        assignOptions(list_of_regions, regionSelector);
+      Plotly.newPlot('compareChart', traces, {
+        title:{ text:'Regional Comparison (CO₂ Intensity)', x:0.01 },
+        margin:{ l:60, r:20, t:50, b:50 },
+        yaxis:{ title:'gCO₂/kWh', automargin:true },
+        xaxis:{ title:'Time', tickformat:'%H:%M<br>%a %d %b' },
+        legend:{ orientation:'h', y:-0.2 }
+      }, { displayModeBar:true, responsive:true });
+    }
 
-        function updateRegion(){
-            setPlot(regionSelector.value);
-            setAreaPlot(regionSelector.value)
-        }
+    const compareGrid = qs('#compareGrid');
+    const compareChips = qs('#compareChips');
+    const compareCount = qs('#compareCount');
+    const clearCompareBtn = qs('#clearCompare');
 
-        regionSelector.addEventListener('change', updateRegion, false);
-        ;
+    const selectedRegions = new Set();
+    const MAX_COMPARE = 5;
 
+    function buildCompareGrid(){
+      compareGrid.innerHTML = regionList.map(r => (
+        `<button type="button" class="toggle" data-region="${r}" aria-pressed="false">${r}</button>`
+      )).join('');
 
-        function setAreaPlot(chosenRegion) {
-            fuels = current_fuels[1]
-            var traces = []
-            for (var i = 0; i < current_mixes[1].length;  i++) {
-                _trace = {
-                    x: current_times,
-                    y: current_mixes.map(entry => entry[i]),
-                    name:fuels[i],
-                    hovertemplate: '<b>%{data.name}</b><br>' + 'Percentage: %{y:.2f}\%' +
-                        '<br>Time: %{x}<br><extra></extra>',
-                    }
-                traces.push(_trace)
-                }
+      compareGrid.addEventListener('click', (e) => {
+        const btn = e.target.closest('.toggle');
+        if(!btn) return;
+        const r = btn.dataset.region;
+        if(r === regionSel.value) return;
 
-            function stackedArea(traces) {
-                var i, j;
-                for(i=1; i<traces.length; i++) {
-                    for(j=0; j<(Math.min(traces[i]['y'].length, traces[i-1]['y'].length)); j++) {
-                        traces[i]['y'][j] += traces[i-1]['y'][j];
-                    }
-                }
-                return traces;
-            }
+        if(selectedRegions.has(r)) selectedRegions.delete(r);
+        else if(selectedRegions.size < MAX_COMPARE) selectedRegions.add(r);
 
-            var _layout = {
-                height: 500,
-                width: 1000,  
-                yaxis: {
-                    automargin: true,
-                    title: {
-                        text: "Fuel Mix Percent",
-                        standoff: 10
-                    }
-                },
-                title: {
-                    text:`Forecast generation mix (%): ${chosenRegion}`,
-                },
-                dragmode:false, 
-            };
+        syncCompareUI();
+      });
 
-            config = {
-                displayModeBar: true,
-            }
+      clearCompareBtn.addEventListener('click', () => {
+        selectedRegions.clear();
+        syncCompareUI();
+      });
 
-            Plotly.newPlot('AreaDiv', traces, _layout, config);  
-        }
-        setAreaPlot(default_region)
+      syncCompareUI();
+    }
 
-        document.querySelector("#loader").style.visibility = "hidden"
-        }
+    function syncCompareUI(){
+      const hidden = qs('#compare');
+      hidden.innerHTML = Array.from(selectedRegions).map(r => `<option value="${r}" selected></option>`).join('');
 
-        // add the loader 
-        document.querySelector("#loader").style.visibility = "visible"
+      compareChips.innerHTML = Array.from(selectedRegions).map(r => (
+        `<span class="chip">${r}<button type="button" aria-label="Remove ${r}" data-remove="${r}">✕</button></span>`
+      )).join('');
+      compareChips.onclick = (e) => {
+        const r = e.target?.dataset?.remove;
+        if(!r) return;
+        selectedRegions.delete(r);
+        syncCompareUI();
+      };
 
-        // Get the current datetime and fetch the data for the following 48 hours.
-        var today = new Date();
-        var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
-        var time = today.getHours() + ":" + today.getMinutes()
-        var dateTime = new Date(date.replace(/-/g, "/")+' '+time)
-        var iso_str = dateTime.toISOString().split(':00.')[0] + 'z';
+      compareCount.textContent = String(selectedRegions.size);
 
-        const Repeat = (arr, repeats) => arr.map(entry => Array.from({length: repeats}, () => entry)).flat()
-        const fetchPromise = fetch(`https://api.carbonintensity.org.uk/regional/intensity/${iso_str}/fw48h`)
-        .then((response) => response.json()).then(function(_data) {_process_data(_data)})
+      const atMax = selectedRegions.size >= MAX_COMPARE;
+      [...compareGrid.querySelectorAll('.toggle')].forEach(btn => {
+        const r = btn.dataset.region;
+        const pressed = selectedRegions.has(r);
+        btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+        btn.disabled = (atMax && !pressed) || (r === regionSel.value);
+      });
 
-        // Cookie set and get functions
-        function setCookie(name,value,days) {
-            var expires = "";
-            if (days) {
-                var date = new Date();
-                date.setTime(date.getTime() + (days*24*60*60*1000));
-                expires = "; expires=" + date.toUTCString();
-            }
-            document.cookie = name + "=" + (value || "")  + expires + "; path=/";
-        }
-        function getCookie(name) {
-            var nameEQ = name + "=";
-            var ca = document.cookie.split(';');
-            for(var i=0;i < ca.length;i++) {
-                var c = ca[i];
-                while (c.charAt(0)==' ') c = c.substring(1,c.length);
-                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
-            }
-            return null;
-        }
-    </script>
-    <div id="heading", align="center">
-        <p>
-            Data comes from the UK National Grid
-            <a
-                href="https://carbon-intensity.github.io/api-definitions/?python#carbon-intensity-api-v2-0-0">
-                carbon intensity API</a>.
-        </p>
-        <p> Want to download the data yourself? Here's a 
-            <a href="https://github.com/Ianlmgoddard/UKCarbonIntensityData.jl">
-                Julia wrapper</a>, and one in 
-            <a href="https://github.com/OSUKED/CIDataPortal">
-                python</a>.
-        </p>
-        <p> If you have any questions or ideas on improvements, feel free to reach out to me on
-            <a href="https://twitter.com/Ian_lmgoddard">
-                twitter</a>, or post an issue on
-            <a href="https://github.com/Ianlmgoddard/CarbonIntensitySite">
-                github</a>.
-        </p>
-    </div>
+      drawComparison();
+    }
+
+    function onSelectedRegionChanged(){
+      if(selectedRegions.has(regionSel.value)){
+        selectedRegions.delete(regionSel.value);
+      }
+      syncCompareUI();
+    }
+
+    function drawAll(){
+      updateSummaryForRegion(regionSel.value);
+      drawIntensity();
+      drawMix();
+      drawComparison();
+      statusEl.textContent = `Showing forecast for region: ${regionSel.value}`;
+    }
+
+    loadAll();
+  })();
+  </script>
 </body>
 </html>
