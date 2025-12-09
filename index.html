@@ -68,7 +68,7 @@
     <section class="card panel" aria-labelledby="summary-title">
       <h2 id="summary-title" class="sr-only">Selected region summary</h2>
       <div class="summary" id="summary">
-        <span class="pill pill-green" id="greenestLabel">Greenest 3-hour window</span>
+        <span class="pill pill-green" id="greenestLabel">Greenest hour window</span>
         <div class="kpis">
           <div class="kpi">
             <h3 id="kpi-time">—</h3>
@@ -95,7 +95,7 @@
       </div>
 
       <div class="panel charts">
-        <div id="intensityChart" class="chart" aria-label="Carbon intensity"></div>
+        <div id="intensityChart" class="chart" aria-label="Carbon intensity + Agile prices"></div>
         <div id="mixChart" class="chart" aria-label="Generation mix"></div>
 
         <div class="subcontrols">
@@ -142,6 +142,40 @@
     const kpiRen = qs('#kpi-renew');
     const backdrop = qs('#backdrop');
 
+    // Carbon Intensity Region → Agile Region Letter
+    const CI_TO_AGILE = {
+      "East Midlands": "B",
+      "East England": "A",
+      "London": "C",
+      "North Wales": "D",
+      "North West": "G",
+      "South Wales": "K",
+      "South West": "L",
+      "South East": "J",
+      "West Midlands": "E",
+      "Yorkshire": "M",
+      "North East": "F",
+      "Scotland": "N",
+      "North Scotland": "P",
+      "South Scotland": "N",
+      "NW": "G",
+      "NE": "F",
+      "SW": "L",
+      "SE": "J",
+      "EM": "B",
+      "WM": "E",
+      "EE": "A",
+      "LN": "C",
+      "YW": "M",
+      "WS": "K",
+      "NS": "P",
+      "SS": "N",
+      "GB": "C",
+      "": "C",
+      null: "C",
+      undefined: "C"
+    };
+
     const setCookie = (k,v,d=365)=>{const t=new Date();t.setTime(t.getTime()+d*24*60*60*1000);document.cookie=`${k}=${encodeURIComponent(v)}; expires=${t.toUTCString()}; path=/`};
     const getCookie = (k)=>{const p=`${k}=`;return document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith(p))?.slice(p.length)||null};
 
@@ -156,6 +190,9 @@
     let times=[], regions=[], forecasts=[], mixes=[], fuels=[], regionList=[];
     let current = {times:[],forecasts:[],mixes:[],fuels:[]};
     let idxNow = 0;
+
+    let agileTimes = [];
+    let agilePrices = [];
 
     const Repeat = (arr, repeats)=>arr.map(x=>Array.from({length:repeats},()=>x)).flat();
     const isRenewable = (fuel)=>['wind','solar','hydro','biomass'].includes(String(fuel||'').toLowerCase());
@@ -197,6 +234,7 @@
         sliceForRegion(defRegion);
 
         updateSummaryForRegion(defRegion);
+        await loadAgileTodayAndTomorrow();  // fills agileTimes/prices
         drawAll();
         showLoading(false);
       }catch(e){
@@ -208,11 +246,14 @@
     function initControls(){
       regionSel.innerHTML = regionList.map(r=>`<option value="${r}">${r}</option>`).join('');
       buildCompareGrid();
-      regionSel.addEventListener('change', ()=>{
-        setCookie('RegionCookie', regionSel.value);
-        sliceForRegion(regionSel.value);
+
+      regionSel.addEventListener('change', async ()=>{
+        const ciRegion = regionSel.value;
+        setCookie('RegionCookie', ciRegion);
+        sliceForRegion(ciRegion);
         onSelectedRegionChanged();
-        updateSummaryForRegion(regionSel.value);
+        updateSummaryForRegion(ciRegion);
+        await loadAgileTodayAndTomorrow();
         drawAll();
       });
     }
@@ -284,38 +325,105 @@
     }
 
     function drawIntensity(){
-        const best = findBestWindow(current.forecasts, 3);
-        const shapes = [];
-        const annotations = [];
-        if(best){
-            const x0 = current.times[best.start], x1 = current.times[best.end];
-            shapes.push({
-            type:'rect', xref:'x', yref:'paper',
-            x0, x1, y0:0, y1:1,
-            fillcolor:'rgba(106,162,255,.12)', line:{width:0}
-            });
-            annotations.push({
-            x:x0, y:1.08, xref:'x', yref:'paper',
-            showarrow:false,
-            text:`Greener window (~${Math.round(best.avg)} gCO₂/kWh)`,
-            font:{size:12}
-            });
+      const best = findBestWindow(current.forecasts, 3);
+      const shapes = [];
+      const annotations = [];
+      if(best){
+        const x0 = current.times[best.start], x1 = current.times[best.end];
+        shapes.push({
+          type:'rect', xref:'x', yref:'paper',
+          x0, x1, y0:0, y1:1,
+          fillcolor:'rgba(106,162,255,.12)', line:{width:0}
+        });
+        annotations.push({
+          x:x0, y:1.08, xref:'x', yref:'paper',
+          showarrow:false,
+          text:`Greener window (~${Math.round(best.avg)} gCO₂/kWh)`,
+          font:{size:12}
+        });
+      }
+
+      const traces = [];
+
+      // Agile bars, filtered to start at forecast start
+      if(agileTimes.length && agilePrices.length && current.times.length){
+        const forecastStart = current.times[0];
+        const barX = [];
+        const barY = [];
+        for(let i=0;i<agileTimes.length;i++){
+          if(agileTimes[i] >= forecastStart){
+            barX.push(agileTimes[i]);
+            barY.push(agilePrices[i]);
+          }
         }
+        if(barX.length){
+          traces.push({
+            x: barX,
+            y: barY,
+            type:'bar',
+            name:'Agile price',
+            yaxis:'y2',
+            opacity:0.4,
+            hoverinfo:'skip' // unified tooltip comes from the line trace
+          });
+        }
+      }
 
-        const trace = {
-            x: current.times, y: current.forecasts,
-            mode:'lines', type:'scatter',
-            line:{width:2},
-            hovertemplate:'Intensity: %{y:.0f} gCO₂/kWh<br>Time: %{x}<extra></extra>'
-        };
+      const priceLookup = new Map();
+      for(let i=0;i<agileTimes.length;i++){
+        priceLookup.set(agileTimes[i].getTime(), agilePrices[i]);
+      }
+      const customPriceText = current.times.map(t=>{
+        const v = priceLookup.get(t.getTime());
+        return (v!=null && isFinite(v)) ? `${v.toFixed(2)} p/kWh` : 'n/a';
+      });
 
-        Plotly.newPlot('intensityChart', [trace], {
-            title:{text:`Forecast CO₂ Intensity — ${regionSel.value}`, x:0.01},
-            margin:{l:60,r:20,t:50,b:50},
-            yaxis:{title:'gCO₂/kWh', automargin:true},
-            xaxis:{title:'Time', tickformat:'%H:%M<br>%a %d %b'},
-            shapes, annotations
-        }, {displayModeBar:true, responsive:true});
+      traces.push({
+        x: current.times,
+        y: current.forecasts,
+        mode:'lines',
+        type:'scatter',
+        name: ' ',
+        //hoverlabel: { namelength: 0 },
+        customdata: customPriceText,
+        hovertemplate:
+          'Intensity: %{y:.0f} gCO₂/kWh<br>' +
+          'Agile price: %{customdata}<extra></extra>',
+      });
+
+      let xMin = current.times[0];
+      let xMax = current.times[current.times.length - 1];
+      if(agileTimes.length){
+        const lastAgile = agileTimes[agileTimes.length - 1];
+        if(lastAgile > xMax) xMax = lastAgile;
+      }
+      const xRange = [xMin, xMax];
+
+      Plotly.newPlot('intensityChart', traces, {
+        title:{text:`Forecast CO₂ Intensity — ${regionSel.value}`, x:0.01},
+        margin:{l:60,r:70,t:50,b:50},
+        hovermode:'x',
+        yaxis:{
+          title:'gCO₂/kWh',
+          automargin:true,
+          showgrid:false
+        },
+        yaxis2:{
+          title:'p/kWh (Agile)',
+          overlaying:'y',
+          side:'right',
+          automargin:true,
+          showgrid:false
+        },
+        xaxis:{
+          title:'Time',
+          tickformat:'%H:%M<br>%a %d %b',
+          showgrid:false,
+          range:xRange
+        },
+        barmode:'overlay',
+        shapes, annotations
+      }, {displayModeBar:true, responsive:true});
     }
 
 
@@ -331,7 +439,7 @@
         title:{text:`Generation Mix (%) — ${regionSel.value}`, x:0.01},
         margin:{l:60,r:20,t:50,b:50},
         yaxis:{title:'Percent', ticksuffix:'%', range:[0,100], automargin:true},
-        xaxis:{title:'Time', tickformat:'%H:%M<br>%a %d %b'},
+        xaxis:{title:'Time', tickformat:'%H:%M<br>%a %d %b', showgrid:false},
         legend:{orientation:'h', y:-0.2}
       }, {displayModeBar:true, responsive:true});
     }
@@ -434,6 +542,95 @@
     }
 
     loadAll();
+
+    // ---------- Agile fetching ----------
+    async function getActiveAgileProductCode(){
+      try{
+        const res = await fetch('https://api.octopus.energy/v1/products/?brand=OCTOPUS_ENERGY&page_size=250');
+        const json = await res.json();
+        const agile = (json.results || [])
+          .filter(p => (p.code || '').startsWith('AGILE-'))
+          .sort((a,b) => new Date(b.available_from || 0) - new Date(a.available_from || 0));
+        const active = agile.find(p => !p.available_to) || agile[0];
+        return active?.code || 'AGILE-24-10-01';
+      }catch{
+        return 'AGILE-24-10-01';
+      }
+    }
+
+    function buildAgileTariff(productCode, regionLetter){
+      return `E-1R-${productCode}-${regionLetter}`;
+    }
+
+    function dayBoundsISO(offsetDays = 0){
+      const now = new Date();
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offsetDays);
+      const start = new Date(d);
+      const end = new Date(d);
+      end.setHours(23, 30, 0, 0);
+      const iso = x => x.toISOString().replace(/\.\d{3}Z$/, 'Z');
+      return {from: iso(start), to: iso(end)};
+    }
+
+    async function fetchAgileForRange(productCode, regionLetter, fromISO, toISO){
+      const tariff = buildAgileTariff(productCode, regionLetter);
+      const url = `https://api.octopus.energy/v1/products/${productCode}` +
+                  `/electricity-tariffs/${tariff}/standard-unit-rates/` +
+                  `?period_from=${encodeURIComponent(fromISO)}` +
+                  `&period_to=${encodeURIComponent(toISO)}&page_size=500`;
+      const r = await fetch(url, {cache: 'no-store'});
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      return (data.results || []).map(row => ({
+        time: new Date(row.valid_from),
+        value: row.value_inc_vat
+      }));
+    }
+
+    async function loadAgileTodayAndTomorrow(){
+      try{
+        const ciRegion = regionSel.value || 'GB';
+        const regionLetter = CI_TO_AGILE[ciRegion] || 'C';
+
+        const productCode = await getActiveAgileProductCode();
+        const todayBounds = dayBoundsISO(0);
+        const tomorrowBounds = dayBoundsISO(1);
+
+        const [todayRows, tomorrowRows] = await Promise.allSettled([
+          fetchAgileForRange(productCode, regionLetter, todayBounds.from, todayBounds.to),
+          fetchAgileForRange(productCode, regionLetter, tomorrowBounds.from, tomorrowBounds.to)
+        ]);
+
+        let points = [];
+        if(todayRows.status === 'fulfilled') points = points.concat(todayRows.value);
+        if(tomorrowRows.status === 'fulfilled') points = points.concat(tomorrowRows.value);
+
+        if(points.length === 0){
+          agileTimes = [];
+          agilePrices = [];
+          return;
+        }
+
+        points.sort((a,b) => a.time - b.time);
+        const dedup = [];
+        const seen = new Set();
+        for(const p of points){
+          const key = p.time.toISOString();
+          if(!seen.has(key)){
+            seen.add(key);
+            dedup.push(p);
+          }
+        }
+
+        agileTimes = dedup.map(p => p.time);
+        agilePrices = dedup.map(p => p.value);
+      }catch(e){
+        console.error('Agile load error', e);
+        agileTimes = [];
+        agilePrices = [];
+      }
+    }
+
   })();
   </script>
 </body>
